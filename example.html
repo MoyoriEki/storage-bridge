@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StorageBridge — 動作確認</title>
+<link rel="stylesheet" href="storage-bridge.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 640px;
+  margin: 40px auto;
+  padding: 0 20px;
+  color: #333;
+  line-height: 1.7;
+}
+h1 { font-size: 20px; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: #999; margin-bottom: 24px; }
+#dbx-ui { margin-bottom: 24px; padding: 12px; border: 1px solid #eee; border-radius: 6px; }
+section { margin-bottom: 20px; }
+section h2 { font-size: 14px; margin-bottom: 8px; color: #666; }
+button {
+  padding: 6px 14px; border: 1px solid #ccc; background: #fafafa;
+  border-radius: 4px; cursor: pointer; font-size: 13px;
+}
+button:hover { border-color: #0061fe; color: #0061fe; }
+button:disabled { opacity: 0.4; cursor: default; border-color: #ccc; color: #999; }
+textarea {
+  width: 100%; height: 80px; padding: 8px; border: 1px solid #ddd;
+  border-radius: 4px; font-family: monospace; font-size: 13px; resize: vertical;
+}
+input[type="text"] {
+  padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px;
+  font-size: 13px; width: 200px;
+}
+#log {
+  background: #f5f5f5; padding: 12px; border-radius: 4px; font-family: monospace;
+  font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto;
+  line-height: 1.5;
+}
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<h1>StorageBridge 動作確認</h1>
+<p class="subtitle">接続 → ファイル一覧 → 保存 → 読み込み のテスト</p>
+
+<div id="dbx-ui"></div>
+
+<section>
+  <h2>ファイル一覧</h2>
+  <div class="row">
+    <input type="text" id="list-path" placeholder="サブフォルダ（空でルート）">
+    <button id="btn-list" disabled>一覧取得</button>
+  </div>
+</section>
+
+<section>
+  <h2>保存テスト</h2>
+  <div class="row" style="margin-bottom:8px">
+    <input type="text" id="save-path" placeholder="ファイル名（例: test.txt）" value="test.txt">
+    <button id="btn-save" disabled>保存</button>
+  </div>
+  <textarea id="save-content" placeholder="保存する内容を入力...">StorageBridge テスト: 現在時刻は…</textarea>
+</section>
+
+<section>
+  <h2>読み込みテスト</h2>
+  <div class="row">
+    <input type="text" id="load-path" placeholder="ファイル名（例: test.txt）" value="test.txt">
+    <button id="btn-load" disabled>読み込み</button>
+  </div>
+</section>
+
+<section>
+  <h2>フォルダ作成</h2>
+  <div class="row">
+    <input type="text" id="folder-path" placeholder="フォルダ名" value="test-folder">
+    <button id="btn-mkdir" disabled>作成</button>
+  </div>
+</section>
+
+<section>
+  <h2>削除テスト</h2>
+  <div class="row">
+    <input type="text" id="del-path" placeholder="パス（例: test.txt）" value="test.txt">
+    <button id="btn-del" disabled>削除</button>
+  </div>
+</section>
+
+<section>
+  <h2>ログ</h2>
+  <div id="log">ストレージブリッジを初期化中…
+</div>
+</section>
+
+<script src="storage-bridge.js"></script>
+<script>
+const logEl = document.getElementById('log');
+function log(msg) {
+  const ts = new Date().toLocaleTimeString('ja-JP');
+  logEl.textContent += `[${ts}] ${msg}\n`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ── 初期化 ──
+const storage = new StorageBridge({
+  basePath: '/storage-bridge-test',
+  storagePrefix: 'sb_example',
+  ui: true,
+  uiTarget: '#dbx-ui',
+});
+
+const btns = document.querySelectorAll('button[id^="btn-"]');
+
+storage.on('connected', () => {
+  log('✔ Dropbox 接続完了');
+  btns.forEach(b => b.disabled = false);
+});
+
+storage.on('disconnected', () => {
+  log('✖ 切断されました');
+  btns.forEach(b => b.disabled = true);
+});
+
+storage.on('error', (e) => {
+  log('⚠ エラー: ' + e.message);
+});
+
+// ── ファイル一覧 ──
+document.getElementById('btn-list').addEventListener('click', async () => {
+  const sub = document.getElementById('list-path').value.trim();
+  log('一覧取得: ' + (sub || '(ルート)'));
+  try {
+    const entries = sub ? await storage.list(sub) : await storage.list();
+    if (entries.length === 0) {
+      log('  (空のフォルダ)');
+    } else {
+      entries.forEach(e => {
+        const tag = e['.tag'] === 'folder' ? '📁' : '📄';
+        log(`  ${tag} ${e.name}`);
+      });
+    }
+  } catch (e) { log('  エラー: ' + e.message); }
+});
+
+// ── 保存 ──
+document.getElementById('btn-save').addEventListener('click', async () => {
+  const path = document.getElementById('save-path').value.trim();
+  const content = document.getElementById('save-content').value;
+  if (!path) return;
+  log('保存: ' + path);
+  try {
+    await storage.save(path, content);
+    log('  ✔ 保存完了');
+  } catch (e) { log('  エラー: ' + e.message); }
+});
+
+// ── 読み込み ──
+document.getElementById('btn-load').addEventListener('click', async () => {
+  const path = document.getElementById('load-path').value.trim();
+  if (!path) return;
+  log('読み込み: ' + path);
+  try {
+    const text = await storage.load(path);
+    log('  ✔ 内容: ' + text.slice(0, 200) + (text.length > 200 ? '…' : ''));
+  } catch (e) { log('  エラー: ' + e.message); }
+});
+
+// ── フォルダ作成 ──
+document.getElementById('btn-mkdir').addEventListener('click', async () => {
+  const path = document.getElementById('folder-path').value.trim();
+  if (!path) return;
+  log('フォルダ作成: ' + path);
+  try {
+    await storage.createFolder(path);
+    log('  ✔ 作成完了');
+  } catch (e) { log('  エラー: ' + e.message); }
+});
+
+// ── 削除 ──
+document.getElementById('btn-del').addEventListener('click', async () => {
+  const path = document.getElementById('del-path').value.trim();
+  if (!path) return;
+  if (!confirm(`"${path}" を削除しますか？`)) return;
+  log('削除: ' + path);
+  try {
+    await storage.delete(path);
+    log('  ✔ 削除完了');
+  } catch (e) { log('  エラー: ' + e.message); }
+});
+
+log('初期化完了。Dropboxに接続してテストしてください。');
+</script>
+</body>
+</html>

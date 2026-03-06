@@ -1,0 +1,129 @@
+/* ========================================================================
+   StorageBridge — DefaultUI スタイル
+   sb- プレフィックスで衝突防止。CSS変数でアプリ側からカスタマイズ可能。
+   ======================================================================== */
+
+:root {
+  --sb-accent: #0061fe;
+  --sb-accent-dim: #4a90d9;
+  --sb-text: #333;
+  --sb-text-dim: #999;
+  --sb-bg: #fff;
+  --sb-border: #ddd;
+  --sb-radius: 4px;
+  --sb-font: system-ui, -apple-system, sans-serif;
+  --sb-font-size: 13px;
+}
+
+/* ── メインUI ── */
+.sb-ui {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--sb-font);
+  font-size: var(--sb-font-size);
+}
+
+.sb-status {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--sb-text-dim);
+}
+.sb-status.sb-on {
+  color: var(--sb-accent);
+}
+
+.sb-connect-btn {
+  background: none;
+  border: 1px solid var(--sb-border);
+  color: var(--sb-text);
+  cursor: pointer;
+  font-family: var(--sb-font);
+  font-size: var(--sb-font-size);
+  padding: 6px 14px;
+  border-radius: var(--sb-radius);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.sb-connect-btn:hover {
+  border-color: var(--sb-accent);
+  color: var(--sb-accent);
+}
+.sb-connect-btn.sb-on {
+  border-color: var(--sb-accent-dim);
+  color: var(--sb-accent);
+}
+
+/* ── モーダル ── */
+.sb-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sb-modal {
+  background: var(--sb-bg);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  font-family: var(--sb-font);
+  font-size: var(--sb-font-size);
+  color: var(--sb-text);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.sb-modal p {
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+
+.sb-appkey-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  font-family: monospace;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.sb-appkey-input:focus {
+  outline: none;
+  border-color: var(--sb-accent);
+}
+
+.sb-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sb-modal-cancel,
+.sb-modal-ok {
+  padding: 7px 18px;
+  border-radius: var(--sb-radius);
+  cursor: pointer;
+  font-family: var(--sb-font);
+  font-size: var(--sb-font-size);
+  border: 1px solid var(--sb-border);
+  background: none;
+  color: var(--sb-text);
+  transition: all 0.12s;
+}
+.sb-modal-cancel:hover {
+  border-color: var(--sb-text-dim);
+}
+.sb-modal-ok {
+  background: var(--sb-accent);
+  border-color: var(--sb-accent);
+  color: #fff;
+}
+.sb-modal-ok:hover {
+  opacity: 0.85;
+}
