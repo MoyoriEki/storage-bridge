@@ -345,22 +345,44 @@ class StorageBridge {
       if (typeof this._auth.checkCallback === 'function') {
         const ok = await this._auth.checkCallback();
         if (ok) {
-          this._onConnected();
+          await this._onConnected();
           return;
         }
       }
       // 保存済みトークンからの復帰
       if (typeof this._auth.tryRestore === 'function' && this._auth.tryRestore()) {
-        this._onConnected();
+        await this._onConnected();
       }
     } catch (e) {
       this._emitError(e);
     }
   }
 
-  _onConnected() {
+  async _onConnected() {
+    await this._ensureBasePath();
     this._ui?.setConnected();
     this._emit('connected');
+  }
+
+  // ── basePath が存在しなければ自動作成 ──
+  async _ensureBasePath() {
+    if (!this._basePath) return;
+    try {
+      await this._apiFetch('files/get_metadata', { path: this._basePath });
+    } catch (e) {
+      // path/not_found → フォルダ作成
+      if (typeof e.message === 'string' && e.message.includes('not_found')) {
+        try {
+          await this._apiFetch('files/create_folder_v2', {
+            path: this._basePath,
+            autorename: false,
+          });
+        } catch (e2) {
+          // conflict（既に別の並行処理で作られた等）は無視
+          if (!e2.message?.includes('conflict')) throw e2;
+        }
+      }
+    }
   }
 
   _emitError(e) {
@@ -505,20 +527,34 @@ class StorageBridge {
     let cursor = null;
     let hasMore = true;
 
-    while (hasMore) {
-      let d;
-      if (!cursor) {
-        d = await this._apiFetch('files/list_folder', {
-          path: resolved,
-          recursive: false,
-          include_non_downloadable_files: false,
-        });
-      } else {
-        d = await this._apiFetch('files/list_folder/continue', { cursor });
+    try {
+      while (hasMore) {
+        let d;
+        if (!cursor) {
+          d = await this._apiFetch('files/list_folder', {
+            path: resolved,
+            recursive: false,
+            include_non_downloadable_files: false,
+          });
+        } else {
+          d = await this._apiFetch('files/list_folder/continue', { cursor });
+        }
+        entries = [...entries, ...d.entries];
+        cursor = d.cursor;
+        hasMore = d.has_more;
       }
-      entries = [...entries, ...d.entries];
-      cursor = d.cursor;
-      hasMore = d.has_more;
+    } catch (e) {
+      // path/not_found → フォルダを自動作成して空配列を返す
+      if (typeof e.message === 'string' && e.message.includes('not_found')) {
+        try {
+          await this._apiFetch('files/create_folder_v2', {
+            path: resolved,
+            autorename: false,
+          });
+        } catch (_) { /* conflict等は無視 */ }
+        return [];
+      }
+      throw e;
     }
     return entries;
   }
