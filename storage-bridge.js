@@ -30,6 +30,10 @@ class TokenManager {
   get verifier()     { return localStorage.getItem(this._key('verifier')); }
   set verifier(v)    { v ? localStorage.setItem(this._key('verifier'), v) : localStorage.removeItem(this._key('verifier')); }
 
+  // 次回の認証でDropboxに再ログインを強制するか（切断後のアカウント切り替え用）
+  get reauth()       { return localStorage.getItem(this._key('reauth')) === '1'; }
+  set reauth(v)      { v ? localStorage.setItem(this._key('reauth'), '1') : localStorage.removeItem(this._key('reauth')); }
+
   get isConnected()  { return !!this.token; }
 
   // ── 全トークン破棄 ──
@@ -96,7 +100,9 @@ class PersonalAuth {
   }
 
   // ── OAuth開始 → Dropbox認証画面にリダイレクト ──
-  async start() {
+  // forceReauth（または切断後の初回）は force_reauthentication を付け、
+  // ブラウザに残っているDropboxのログインを使い回さずにアカウントを選び直させる
+  async start(opts = {}) {
     const { verifier, challenge } = await this._genPKCE();
     this._tm.verifier = verifier;
     const params = new URLSearchParams({
@@ -107,6 +113,9 @@ class PersonalAuth {
       redirect_uri: location.origin + location.pathname,
       token_access_type: 'offline',
     });
+    if (opts.forceReauth || this._tm.reauth) {
+      params.set('force_reauthentication', 'true');
+    }
     location.href = 'https://www.dropbox.com/oauth2/authorize?' + params;
   }
 
@@ -139,6 +148,7 @@ class PersonalAuth {
       this._tm.refreshToken = d.refresh_token;
     }
     this._tm.verifier = null;
+    this._tm.reauth = null;
     window.history.replaceState({}, '', location.pathname);
     return true;
   }
@@ -324,15 +334,23 @@ class StorageBridge {
   getToken() { return this._tm.token; }
 
   // ── 認証 ──
-  async connect() {
+  // opts.forceReauth: Dropboxに再ログインを求める（別アカウントへの切り替え用）
+  async connect(opts = {}) {
     try {
-      await this._auth.start();
+      await this._auth.start(opts);
     } catch (e) {
       this._emitError(e);
     }
   }
 
+  // ユーザー操作による切断。次の connect() ではDropboxに再ログインを求め、
+  // 間違ったアカウントで繋いだ場合でも別アカウントを選び直せるようにする
   disconnect() {
+    this._tm.reauth = true;
+    this._resetConnection();
+  }
+
+  _resetConnection() {
     this._tm.clear();
     this._ui?.setDisconnected();
     this._emit('disconnected');
@@ -474,7 +492,8 @@ class StorageBridge {
     try {
       await this._tm.refresh();
     } catch (_) {
-      this.disconnect();
+      // セッション切れは同じアカウントで繋ぎ直すだけなので再ログインは強制しない
+      this._resetConnection();
       throw new Error('セッション切れ。再接続してください');
     }
   }
