@@ -51,12 +51,21 @@ await storage.delete(path)            // 削除
 await storage.createFolder(path)      // フォルダ作成
 await storage.move(from, to)          // 移動/リネーム
 storage.connect()                     // 認証開始
-storage.disconnect()                  // 切断
+storage.connect({ forceReauth: true }) // Dropboxに再ログインさせて認証（アカウント切り替え）
+storage.disconnect()                  // 切断（次の connect() は再ログインを求める）
 storage.isConnected                   // boolean
 storage.getToken()                    // トークン取得（同期XHR用）
 ```
 
 パスは全て **basePath からの相対パス**。先頭 `/` は禁止（エラーになる）。
+
+## アカウントの切り替え
+
+Dropboxの認証画面は、ブラウザがDropboxにログイン済みだとそのアカウントをそのまま使う。
+間違ったアカウントで接続してしまった場合に戻れなくなるので、`disconnect()` した後の
+最初の `connect()` には `force_reauthentication` を付け、Dropboxに再ログインを求める
+（ブラウザのDropbox.comからもログアウトされる）。認証に成功すると通常に戻る。
+トークンのリフレッシュ失敗による自動切断では再ログインは求めない。
 
 ## イベント
 
